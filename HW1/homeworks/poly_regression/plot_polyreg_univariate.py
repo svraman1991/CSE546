@@ -21,7 +21,7 @@ if __name__ == "__main__":
 
     # regression with degree = d
     d = 8
-    rl = 0
+    rl = 1
     model = PolynomialRegression(degree=d, reg_lambda=rl)
     model.fit(X, y)
 
@@ -32,8 +32,8 @@ if __name__ == "__main__":
     # plot curve
     plt.figure()
     plt.plot(X, y, "rx")
-    plt.title(f"PolyRegression with d = {d}")
+    plt.title(f"PolyRegression with d = {d} and regularization = {rl}")
     plt.plot(xpoints, ypoints, "b-")
     plt.xlabel("X")
-    plt.ylabel(f'Degree = {rl}')
+    plt.ylabel("Y")
     plt.show()
