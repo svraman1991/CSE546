@@ -191,5 +191,22 @@ def learningCurve(
 
     errorTrain = np.zeros(n)
     errorTest = np.zeros(n)
-    # Fill in errorTrain and errorTest arrays
+
+    for i in range(n):
+        if i == 0:
+            errorTrain[i] = 1e-8
+            errorTest[i] = 1e-8
+        else:
+            XTrainSet = Xtrain[0:i + 1]
+            YTrainSet = Ytrain[0:i + 1]
+            TrainResults = PolynomialRegression(degree=degree, reg_lambda=reg_lambda)
+            TrainResults.fit(XTrainSet, YTrainSet)
+            TrainPredict = TrainResults.predict(XTrainSet)
+            errorTrain[i] = mean_squared_error(TrainPredict, YTrainSet)
+
+            TestPredict = TrainResults.predict(Xtest)
+            errorTest[i] = mean_squared_error(TestPredict, Ytest)
+
+    return tuple((errorTrain, errorTest))
+
     # raise NotImplementedError("Your Code Goes Here")
