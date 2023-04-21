@@ -24,7 +24,12 @@ def train(x: np.ndarray, y: np.ndarray, _lambda: float) -> np.ndarray:
         np.ndarray: weight matrix of shape `(d, k)`
             which minimizes Regularized Squared Error on `x` and `y` with hyperparameter `_lambda`.
     """
-    raise NotImplementedError("Your Code Goes Here")
+    n, d = x.shape
+    lambda_matrix = _lambda * np.identity(d, dtype="int")
+    weight = np.linalg.solve(x.T @ x + lambda_matrix, x.T @ y)
+    return weight
+
+    # raise NotImplementedError("Your Code Goes Here")
 
 
 @problem.tag("hw1-A")
@@ -72,7 +77,13 @@ def one_hot(y: np.ndarray, num_classes: int) -> np.ndarray:
         ]
         ```
     """
-    raise NotImplementedError("Your Code Goes Here")
+    n = len(y)
+    temp_one = np.zeros((n, num_classes))
+    for i in range(n):
+        k = y[i]
+        temp_one[i,k] = 1
+    return temp_one
+    #raise NotImplementedError("Your Code Goes Here")
 
 
 def main():

@@ -19,8 +19,10 @@ class PolynomialRegression:
         self.reg_lambda: float = reg_lambda
         # Fill in with matrix with the correct shape
         self.weight: np.ndarray = None  # type: ignore
+        self.fit_mean: np.ndarray = None  # type: ignore
+        self.fit_std: np.ndarray = None  # type: ignore
         # You can add additional fields
-        self.theta = None
+        # self.theta = None
         # raise NotImplementedError("Your Code Goes Here")
 
     @staticmethod
@@ -65,30 +67,36 @@ class PolynomialRegression:
             You will need to apply polynomial expansion and data standardization first.
         """
         # 1. applying polynomial expansion to the input data
-        #print(f'shape of input data is {X.shape}')
+        # print(f'shape of input data is {X.shape}')
         X_ = self.polyfeatures(X, self.degree)
 
         # 2. Standardizing the expanded matrix
         X_std = (X_ - np.mean(X_, axis=0)) / (np.std(X_, axis=0))
-
+        self.fit_mean = np.mean(X_, axis=0)
+        self.fit_std = np.std(X_, axis=0)
         # 3. Adding the bias term
         n1, d1 = X_std.shape
+        '''
         newdata = np.zeros((n1, d1 + 1))
         newdata[:, 0] = 1
-
         for i in range(n1):
             for j in range(d1):
                 newdata[i, j + 1] = X_std[i, j]
+        '''
+
+        newdata = np.c_[np.ones([n1, 1]), X_std]
 
         # 4. Solving for the coefficients
         reg_matrix = self.reg_lambda * np.eye(d1 + 1)
         reg_matrix[0, 0] = 0
-        #print(f'shape of newdata is is {newdata.shape}')
+        # print(f'shape of newdata is is {newdata.shape}')
+        np.savetxt('input.csv', newdata, fmt="%f", delimiter=",")
 
         # analytical solution (X'X + regMatrix)^-1 X' y
-        self.theta = np.linalg.solve(newdata.T @ newdata + reg_matrix, newdata.T @ y)
-        #print(self.theta.shape)
-        #print(f'theta values are {self.theta}')
+        #self.theta = np.linalg.solve(newdata.T @ newdata + reg_matrix, newdata.T @ y)
+        self.weight = np.linalg.solve(newdata.T @ newdata + reg_matrix, newdata.T @ y)
+        # print(self.theta.shape)
+        # print(f'theta values are {self.theta}')
 
         # raise NotImplementedError("Your Code Goes Here")
 
@@ -103,24 +111,33 @@ class PolynomialRegression:
         Returns:
             np.ndarray: Array of shape (n, 1) with predictions.
         """
-        #print(f'shape of test data is {X.shape}')
-        #n = len(X)
+        # print(f'shape of test data is {X.shape}')
+        # n = len(X)
         X_ = self.polyfeatures(X, self.degree)
-        X_std = (X_ - np.mean(X_, axis=0)) / (np.std(X_, axis=0))
+        X_std = (X_ - self.fit_mean) / (self.fit_std)
         # X_std = (X - np.mean(X, axis=0)) / (np.std(X, axis=0))
+
+        # print(f'the standardized input is \n {X_std}')
+
+        # X_std.tofile('output.csv', sep=',', format='%10.5f')
+        #np.savetxt('output.csv', X_std, fmt="%f", delimiter=",")
+
 
         # add 1s column
         # X_ = np.c_[np.ones([n, 1]), X_std]
         n1, d1 = X_std.shape
+        '''
         newdata = np.zeros((n1, d1 + 1))
         newdata[:, 0] = 1
 
         for i in range(n1):
             for j in range(d1):
                 newdata[i, j + 1] = X_std[i, j]
+        '''
+        newdata = np.c_[np.ones([n1, 1]), X_std]
 
         # predict
-        return newdata.dot(self.theta)
+        return newdata.dot(self.weight)
         # raise NotImplementedError("Your Code Goes Here")
 
 
@@ -174,5 +191,22 @@ def learningCurve(
 
     errorTrain = np.zeros(n)
     errorTest = np.zeros(n)
-    # Fill in errorTrain and errorTest arrays
+
+    for i in range(n):
+        if i == 0:
+            errorTrain[i] = 1e-8
+            errorTest[i] = 1e-8
+        else:
+            XTrainSet = Xtrain[0:i + 1]
+            YTrainSet = Ytrain[0:i + 1]
+            TrainResults = PolynomialRegression(degree=degree, reg_lambda=reg_lambda)
+            TrainResults.fit(XTrainSet, YTrainSet)
+            TrainPredict = TrainResults.predict(XTrainSet)
+            errorTrain[i] = mean_squared_error(TrainPredict, YTrainSet)
+
+            TestPredict = TrainResults.predict(Xtest)
+            errorTest[i] = mean_squared_error(TestPredict, Ytest)
+
+    return tuple((errorTrain, errorTest))
+
     # raise NotImplementedError("Your Code Goes Here")
