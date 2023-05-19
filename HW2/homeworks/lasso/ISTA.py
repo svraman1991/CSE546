@@ -6,6 +6,33 @@ import numpy as np
 from utils import problem
 
 
+def random_data_generator(n, d, k, mean, variance) -> Tuple[np.ndarray, np.ndarray]:
+    """Generates random data sets for X and y based on the dimensions and noise
+
+    Args:
+        n: number of rows of X
+        d: number of features of X
+        k: number of relevant features of X
+        mean: mean of the noise term
+        variance: variance of the noise term
+
+    Returns:
+        Tuple[np.ndarray, np.ndarray]: Tuple with 2 entries. First represents input data X, second represents response y
+
+    """
+    w = np.zeros((d, 1))
+
+    for j in range(k) :
+        w[j] = (j + 1) / k
+
+    X = np.random.normal(size=(n, d))
+    noise = np.random.normal(scale=np.sqrt(variance), size=(n,))
+
+    y = np.reshape(np.dot(w.T, X.T) + noise.T, (n,))
+
+    return (X, y)
+
+
 @problem.tag("hw2-A")
 def step(
     X: np.ndarray, y: np.ndarray, weight: np.ndarray, bias: float, _lambda: float, eta: float
@@ -23,9 +50,38 @@ def step(
 
     Returns:
         Tuple[np.ndarray, float]: Tuple with 2 entries. First represents updated weight vector, second represents bias.
-    
+
     """
-    raise NotImplementedError("Your Code Goes Here")
+    # weight = weight.reshape(len(weight), 1)
+    # weight_ = np.zeros(weight.shape)
+    n = X.shape[0]
+    d = X.shape[1]
+
+    if weight is None:
+        w = np.zeros((d,))
+    else:
+        w = weight
+
+    bias_ = bias - 2 * eta * np.sum(X.dot(weight) + bias - y)
+
+    c = w.copy()
+    for k in range(d):
+
+        # c[k] = w[k] - 2 * eta * np.dot((np.dot(w.T, X.T) - y), X.T[k])
+        c[k] = w[k] - 2 * eta * np.dot(np.squeeze(np.dot(w.T, X.T)) + bias_ - y, X.T[k])
+
+        if np.isnan(c[k]):
+            w[k] = 0
+        elif c[k] < -2 * eta * _lambda:
+            w[k] = c[k] + 2 * eta * _lambda
+        elif c[k] > 2 * eta * _lambda:
+            w[k] = c[k] - 2 * eta * _lambda
+        else:
+            w[k] = 0
+
+    return (w, bias_)
+
+    # raise NotImplementedError("Your Code Goes Here")
 
 
 @problem.tag("hw2-A")
@@ -44,7 +100,10 @@ def loss(
     Returns:
         float: value of the loss function
     """
-    raise NotImplementedError("Your Code Goes Here")
+
+    return np.square(np.subtract(y, (bias + np.dot(X, weight)))).sum() + _lambda * np.linalg.norm(weight, 1)
+
+    # raise NotImplementedError("Your Code Goes Here")
 
 
 @problem.tag("hw2-A", start_line=5)
@@ -94,7 +153,16 @@ def train(
         start_bias = 0
     old_w: Optional[np.ndarray] = None
     old_b: Optional[np.ndarray] = None
-    raise NotImplementedError("Your Code Goes Here")
+
+    while not convergence_criterion(start_weight, old_w, start_bias, old_b, convergence_delta):
+        old_w = start_weight.copy()
+        old_b = start_bias
+        start_weight, start_bias = step(X, y, start_weight, start_bias, _lambda, eta)
+        old_b = start_bias
+
+    return (start_weight, start_bias)
+
+    # raise NotImplementedError("Your Code Goes Here")
 
 
 @problem.tag("hw2-A")
@@ -102,7 +170,7 @@ def convergence_criterion(
     weight: np.ndarray, old_w: np.ndarray, bias: float, old_b: float, convergence_delta: float
 ) -> bool:
     """Function determining whether weight has converged or not.
-    It should calculate the maximum absolute change between weight and old_w vector, and compate it to convergence delta.
+    It should calculate the maximum absolute change between weight and old_w vector, and compare it to convergence delta.
 
     Args:
         weight (np.ndarray): Weight from current iteration of coordinate gradient descent.
@@ -112,7 +180,14 @@ def convergence_criterion(
     Returns:
         bool: False, if weight has not converged yet. True otherwise.
     """
-    raise NotImplementedError("Your Code Goes Here")
+
+    if old_w is None or old_b is None:
+        return False
+
+    max_abs_delta = max(abs(weight - old_w))
+    return max_abs_delta <= convergence_delta
+
+    # raise NotImplementedError("Your Code Goes Here")
 
 
 @problem.tag("hw2-A")
@@ -120,7 +195,78 @@ def main():
     """
     Use all of the functions above to make plots.
     """
-    raise NotImplementedError("Your Code Goes Here")
+    n = 500
+    d = 1000
+    k = 100
+    mean = 0
+    var = 1
+    # Step 1 - Create the random set of data
+    X, y = random_data_generator(n, d, k, mean, var)
+
+    # Step 2 - Standardize X and save values
+    X_std = (X - np.mean(X, axis=0)) / (np.std(X, axis=0))
+    fit_mean = np.mean(X, axis=0)
+    fit_std = np.std(X, axis=0)
+
+    # Step 3 - Calculate lambda_max, the initial step
+    _lambda = 2 * np.max(np.abs(np.dot(y.T - np.mean(y), X_std)))
+    _lambda_step = 2
+    eta = 1
+    convergence_delta = 1
+
+    # Step 4 - Solve multiple lasso problems using decreasing lambda
+    current_lambda = _lambda
+    lambda_vals = [_lambda]
+
+    FDR_list = []
+    TPR_list = []
+
+    W_all = np.zeros((d, 1))
+    while np.count_nonzero(W_all[:, -1]) < d :
+
+        print("Current lambda = ", current_lambda)
+
+        (w_new, bias) = train(X_std, y, current_lambda, eta, convergence_delta)
+        W_all = np.concatenate((W_all, np.expand_dims(w_new, axis=1)), axis=1)
+
+        nonzeros = np.nonzero(W_all)[0]
+        incorrect_nonzeros = np.sum(W_all[nonzeros] == 0)
+        total_nonzeros = len(nonzeros)
+        FDR = incorrect_nonzeros / total_nonzeros
+
+        correct_nonzeros = np.sum(np.abs(W_all[nonzeros]) > 0)
+        TPR = correct_nonzeros / k
+
+        FDR_list.append(FDR)
+        TPR_list.append(TPR)
+
+        current_lambda = current_lambda / _lambda_step
+        lambda_vals.append(current_lambda)
+
+    # Step 5 - Plot the relationship between the lambda values and sparsity of weight vector
+    # print(f'lambda values are {lambda_vals} \n')
+    # print(f'non zeroes are {np.count_nonzero(W_all, axis = 0)} \n')
+
+    plt.figure(1)
+    plt.semilogx(lambda_vals, np.count_nonzero(W_all, axis=0), 'r-')
+    plt.xlabel('log(lambda)')
+    plt.ylabel('Nonzero Coefficients in w')
+    plt.title('A5a: Nonzero weights versus Lambda')
+    plt.show()
+
+    # Part 2 - A5b
+
+    print(FDR_list)
+    print(TPR_list)
+
+    plt.figure(2)
+    plt.plot(FDR_list, TPR_list)
+    plt.xlabel('FDR')
+    plt.ylabel('TPR')
+    plt.title('A5b: FDR vs. TPR ')
+    plt.show()
+
+    # raise NotImplementedError("Your Code Goes Here")
 
 
 if __name__ == "__main__":
