@@ -23,4 +23,6 @@ class MSELossLayer(nn.Module):
             - YOU ARE NOT ALLOWED to use torch.nn.MSELoss (or it's functional counterparts) in this class
             - Make use of pytorch documentation: https://pytorch.org/docs/stable/index.html
         """
-        raise NotImplementedError("Your Code Goes Here")
+        v_mse = torch.mean(torch.pow(y_true - y_pred, 2))
+        return v_mse
+        # raise NotImplementedError("Your Code Goes Here")

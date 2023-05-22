@@ -41,7 +41,10 @@ def poly_kernel(x_i: np.ndarray, x_j: np.ndarray, d: int) -> np.ndarray:
             They apply an operation similar to xx^T (if x is a vector), but not necessarily with multiplication.
             To use it simply append .outer to function. For example: np.add.outer, np.divide.outer
     """
-    raise NotImplementedError("Your Code Goes Here")
+
+    K = (np.outer(x_i, x_j) + 1) ** d
+    return K
+    # raise NotImplementedError("Your Code Goes Here")
 
 
 @problem.tag("hw3-A")
@@ -66,7 +69,10 @@ def rbf_kernel(x_i: np.ndarray, x_j: np.ndarray, gamma: float) -> np.ndarray:
             They apply an operation similar to xx^T (if x is a vector), but not necessarily with multiplication.
             To use it simply append .outer to function. For example: np.add.outer, np.divide.outer
     """
-    raise NotImplementedError("Your Code Goes Here")
+    sq_diff = np.square(np.subtract.outer(x_i, x_j))
+    K = np.exp(-gamma * sq_diff)
+    return K
+    # raise NotImplementedError("Your Code Goes Here")
 
 
 @problem.tag("hw3-A")
@@ -89,7 +95,27 @@ def train(
     Returns:
         np.ndarray: Array of shape (n,) containing alpha hat as described in the pdf.
     """
-    raise NotImplementedError("Your Code Goes Here")
+    n = len(x)
+    K = kernel_function(x, x, kernel_param)
+    alpha_hat = np.linalg.solve(K + _lambda * np.eye(n), y)
+    return alpha_hat
+    # raise NotImplementedError("Your Code Goes Here")
+
+
+def mean_squared_error(a: np.ndarray, b: np.ndarray) -> float:
+    """Given two arrays: a and b, both of shape (n, 1) calculate a mean squared error.
+
+    Args:
+        a (np.ndarray): Array of shape (n, 1)
+        b (np.ndarray): Array of shape (n, 1)
+
+    Returns:
+        float: mean squared error between a and b.
+    """
+    if a.shape != b.shape:
+        return -1
+    else:
+        return np.square(np.subtract(a, b)).mean()
 
 
 @problem.tag("hw3-A", start_line=1)
@@ -120,7 +146,28 @@ def cross_validation(
         float: Average loss of trained function on validation sets across folds.
     """
     fold_size = len(x) // num_folds
-    raise NotImplementedError("Your Code Goes Here")
+    loss_sum = 0.0
+
+    for i in range(num_folds):
+        start = i * fold_size
+        end = start + fold_size
+
+        x_train = np.concatenate((x[:start], x[end:]))
+        y_train = np.concatenate((y[:start], y[end:]))
+        x_val = x[start:end]
+        y_val = y[start:end]
+
+        alpha_hat = train(x_train, y_train, kernel_function, kernel_param, _lambda)
+
+        y_pred = np.dot(kernel_function(x_val, x_train, kernel_param), alpha_hat)
+
+        # mse = np.mean((y_val - y_pred) ** 2)
+        mse = mean_squared_error(y_val, y_pred)
+        loss_sum += mse
+
+    avg_loss = loss_sum / num_folds
+    return avg_loss
+    # raise NotImplementedError("Your Code Goes Here")
 
 
 @problem.tag("hw3-A")
@@ -148,7 +195,24 @@ def rbf_param_search(
         - If using random search we recommend sampling lambda from distribution 10**i, where i~Unif(-5, -1)
         - If using grid search we recommend choosing possible lambdas to 10**i, where i=linspace(-5, -1)
     """
-    raise NotImplementedError("Your Code Goes Here")
+    opt_loss = float('inf')
+    opt_lambda = None
+    opt_gamma = None
+
+    # Implementing Grid search
+
+    lambdas = [10 ** i for i in np.linspace(-5, -1, num=100)]
+    for _lambda in lambdas:
+        gamma = 1 / np.median(np.square(np.subtract.outer(x, x)))
+        loss = cross_validation(x, y, rbf_kernel, gamma, _lambda, num_folds)
+        if loss < opt_loss:
+            opt_loss = loss
+            opt_lambda = _lambda
+            opt_gamma = gamma
+
+    return opt_lambda, opt_gamma
+
+    # raise NotImplementedError("Your Code Goes Here")
 
 
 @problem.tag("hw3-A")
@@ -172,14 +236,33 @@ def poly_param_search(
         Tuple[float, int]: Tuple containing best performing lambda and d pair.
 
     Note:
-        - You can use gamma = 1 / median((x_i - x_j)^2) for all unique pairs x_i, x_j in x) for this problem. 
+        - You can use gamma = 1 / median((x_i - x_j)^2) for all unique pairs x_i, x_j in x) for this problem.
           However, if you would like to search over other possible values of gamma, you are welcome to do so.
         - If using random search we recommend sampling lambda from distribution 10**i, where i~Unif(-5, -1)
             and d from distribution [5, 6, ..., 24, 25]
         - If using grid search we recommend choosing possible lambdas to 10**i, where i=linspace(-5, -1)
             and possible ds to [5, 6, ..., 24, 25]
     """
-    raise NotImplementedError("Your Code Goes Here")
+    opt_loss = float('inf')
+    opt_lambda = None
+    opt_d = None
+
+    # Implementing Grid search
+
+    lambdas = [10 ** i for i in np.linspace(-5, -1, num=100)]
+    d_values = range(5, 25)
+
+    for _lambda in lambdas:
+        for d in d_values:
+            loss = cross_validation(x, y, poly_kernel, d, _lambda, num_folds)
+            if loss < opt_loss:
+                opt_loss = loss
+                opt_lambda = _lambda
+                opt_d = d
+
+    return opt_lambda, opt_d
+    # raise NotImplementedError("Your Code Goes Here")
+
 
 @problem.tag("hw3-A", start_line=1)
 def main():
@@ -197,7 +280,51 @@ def main():
             To avoid this call plt.ylim(-6, 6).
     """
     (x_30, y_30), (x_300, y_300), (x_1000, y_1000) = load_dataset("kernel_bootstrap")
-    raise NotImplementedError("Your Code Goes Here")
+
+    # print(f'x_30 is {x_30} and \n , y_30 is {y_30}')
+    rbf_lambda, rbf_gamma = rbf_param_search(x_30, y_30, num_folds=30)
+    poly_lambda, poly_d = poly_param_search(x_30, y_30, num_folds=30)
+
+    print('Optimal Parameters: \n')
+
+    print(f'RBF Lambda:{rbf_lambda}  and RBF Gamma:{rbf_gamma} \n')
+    print(f'Poly Lambda:{poly_lambda} and Poly d:{poly_d} \n')
+
+    fine_grid = np.linspace(0, 1, num=100)
+
+    # RBF Plots
+    rbf_pred = rbf_kernel(x_30, fine_grid[:, np.newaxis], rbf_gamma)
+    rbf_alpha = train(x_30, y_30, rbf_kernel, rbf_gamma, rbf_lambda)
+    rbf_pred = np.squeeze(rbf_pred)
+    rbf_pred = np.dot(rbf_alpha, rbf_pred)
+
+    # True function plot
+    plt.plot(x_30, y_30, 'mx', label='True Data')
+    plt.plot(fine_grid, f_true(fine_grid), 'm--', label='True Function')
+    # RBF Plots
+    plt.plot(fine_grid, rbf_pred, label='RBF Kernel')
+    plt.title('Plot for RBF Kernel and True function')
+    plt.ylim(-6, 14)
+    plt.legend()
+    plt.show()
+
+    # Poly Plots
+    poly_pred = poly_kernel(x_30, fine_grid[:, np.newaxis], poly_d)
+    poly_alpha = train(x_30, y_30, poly_kernel, poly_d, poly_lambda)
+    poly_pred = np.squeeze(poly_pred)
+    poly_pred = np.dot(poly_alpha, poly_pred)
+
+    # True function plot
+    plt.plot(x_30, y_30, 'mx', label='True Data')
+    plt.plot(fine_grid, f_true(fine_grid), 'm--', label='True Function')
+    # Poly Plots
+    plt.plot(fine_grid, poly_pred, label='Poly Kernel')
+    plt.title('Plot for Poly Kernel and True function')
+    plt.ylim(-6, 14)
+    plt.legend()
+    plt.show()
+
+    # raise NotImplementedError("Your Code Goes Here")
 
 
 if __name__ == "__main__":

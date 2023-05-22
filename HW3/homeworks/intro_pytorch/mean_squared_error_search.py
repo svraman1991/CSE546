@@ -23,6 +23,75 @@ from utils import load_dataset, problem
 RNG = torch.Generator()
 RNG.manual_seed(446)
 
+# Code for the various methods that will be used
+
+
+# Linear Regression
+class LinearRegression(nn.Module):
+
+    def __init__(self):
+        super(LinearRegression, self).__init__()
+        self.layer = LinearLayer(2, 2, generator=RNG)
+
+    def forward(self, x):
+        return self.layer(x)
+
+
+# Sigmoid
+class sigmoid(nn.Module):
+
+    def __init__(self):
+        super(sigmoid, self).__init__()
+        self.layer1 = LinearLayer(2, 2, generator=RNG)
+        self.sigma = SigmoidLayer()
+        self.layer2 = LinearLayer(2, 2, generator=RNG)
+
+    def forward(self, x):
+        return self.layer2(self.sigma(self.layer1(x)))
+
+
+# RELU
+class relu(nn.Module):
+
+    def __init__(self):
+        super(relu, self).__init__()
+        self.layer1 = LinearLayer(2, 2, generator=RNG)
+        self.relu = ReLULayer()
+        self.layer2 = LinearLayer(2, 2, generator=RNG)
+
+    def forward(self, x):
+        return self.layer2(self.relu(self.layer1(x)))
+
+
+# Sigmoid and RELU
+class sigmarelu(nn.Module):
+
+    def __init__(self):
+        super(sigmarelu, self).__init__()
+        self.layer1 = LinearLayer(2, 2, generator=RNG)
+        self.sigma = SigmoidLayer()
+        self.layer2 = LinearLayer(2, 2, generator=RNG)
+        self.relu = ReLULayer()
+        self.layer3 = LinearLayer(2, 2, generator=RNG)
+
+    def forward(self, x):
+        return self.layer3(self.relu(self.layer2(self.sigma(self.layer1(x)))))
+
+
+# RELU and Sigmoid
+class relusigma(nn.Module):
+
+    def __init__(self):
+        super(relusigma, self).__init__()
+        self.layer1 = LinearLayer(2, 2, generator=RNG)
+        self.sigma = SigmoidLayer()
+        self.layer2 = LinearLayer(2, 2, generator=RNG)
+        self.relu = ReLULayer()
+        self.layer3 = LinearLayer(2, 2, generator=RNG)
+
+    def forward(self, x):
+        return self.layer3(self.sigma(self.layer2(self.relu(self.layer1(x)))))
+
 
 @problem.tag("hw3-A")
 def accuracy_score(model: nn.Module, dataloader: DataLoader) -> float:
@@ -45,7 +114,17 @@ def accuracy_score(model: nn.Module, dataloader: DataLoader) -> float:
         - This is similar to CrossEntropy accuracy_score function,
             but there will be differences due to slightly different targets in dataloaders.
     """
-    raise NotImplementedError("Your Code Goes Here")
+    is_accurate = 0
+    all = 0
+
+    with torch.no_grad():
+        for (x, y) in dataloader:
+            is_accurate += torch.sum(model(x).argmax(dim=1) == y.argmax(dim=1)).item()
+            all += y.shape[0]
+
+    v_accuracy = is_accurate / all
+    return v_accuracy
+    # raise NotImplementedError("Your Code Goes Here")
 
 
 @problem.tag("hw3-A")
@@ -87,7 +166,28 @@ def mse_parameter_search(
                 }
             }
     """
-    raise NotImplementedError("Your Code Goes Here")
+    v_models = {
+        "LinearRegression": LinearRegression(),
+        "Sigmoid": sigmoid(),
+        "ReLU": relu(),
+        "Sigmoid_ReLU": sigmarelu(),
+        "ReLU_Sigmoid": relusigma()
+    }
+
+    v_train_history = dict()
+
+    for v_model_name, v_model in v_models.items():
+        print(v_model_name)
+        v_optimizer = SGDOptimizer(v_model.parameters(), lr=1e-3)
+        v_train_results = train(dataset_train, v_model, MSELossLayer(), v_optimizer, dataset_val, epochs=75)
+        v_train_history[v_model_name] = {
+            "train": v_train_results["train"],
+            "val": v_train_results["val"],
+            "model": v_model
+        }
+    return v_train_history
+
+    # raise NotImplementedError("Your Code Goes Here")
 
 
 @problem.tag("hw3-A", start_line=11)
@@ -108,16 +208,53 @@ def main():
     """
     (x, y), (x_val, y_val), (x_test, y_test) = load_dataset("xor")
 
-    dataset_train = TensorDataset(torch.from_numpy(x), torch.from_numpy(to_one_hot(y)))
-    dataset_val = TensorDataset(
-        torch.from_numpy(x_val), torch.from_numpy(to_one_hot(y_val))
-    )
-    dataset_test = TensorDataset(
-        torch.from_numpy(x_test), torch.from_numpy(to_one_hot(y_test))
-    )
+    dataset_train = DataLoader(TensorDataset(torch.from_numpy(x).float(), torch.from_numpy(to_one_hot(y)).float()), generator=RNG, batch_size=8)
+    dataset_val = DataLoader(TensorDataset(torch.from_numpy(x_val).float(), torch.from_numpy(to_one_hot(y_val)).float()), batch_size=8)
+    dataset_test = DataLoader(TensorDataset(torch.from_numpy(x_test).float(), torch.from_numpy(to_one_hot(y_test)).float()), batch_size=8)
 
     mse_configs = mse_parameter_search(dataset_train, dataset_val)
-    raise NotImplementedError("Your Code Goes Here")
+
+    # Plotting the results
+    v_colors = ['k', 'r', 'g', 'b', 'm', 'k', 'r', 'g', 'b', 'm']
+    v_labels = []
+    v_count = 0
+    v_values = {}
+
+    for key, value in mse_configs.items():
+        plt.plot(value['train'], v_colors[v_count])
+        plt.plot(value['val'], v_colors[v_count + 1])
+        v_labels.append(key + ' training loss')
+        v_labels.append(key + ' validation loss')
+        v_count += 2
+        v_values[key] = value['val']
+
+    plt.legend(v_labels)
+    plt.xlabel('epoch')
+    plt.ylabel('MSE Loss')
+    plt.title('MSE Training and Validation loss by model')
+    plt.savefig('MSE.png')
+    plt.show()
+
+    # Finding the best model from above
+    v_values = {v_name: min(v_val) for v_name, v_val in v_values.items()}
+    v_sorted_values = sorted(v_values.items(), key=lambda x : x[1])
+    v_best_model, v_value = v_sorted_values[0]
+
+    print(f'The best model is {v_best_model} with loss value of {v_value}')
+
+    # print(f'MSEconfig= {mse_configs[v_best_model]["model"]}')
+    # print(f'dataset_test= {dataset_test}')
+
+    plot_model_guesses(
+        dataset_test,
+        model=mse_configs[v_best_model]["model"],
+        title='MSE: {}'.format(v_best_model)
+    )
+
+    v_acc_score = accuracy_score(mse_configs[v_best_model]["model"], dataset_test)
+    print(f'The best model is {v_best_model} with an accuracy of {v_acc_score}')
+
+    # raise NotImplementedError("Your Code Goes Here")
 
 
 def to_one_hot(a: np.ndarray) -> np.ndarray:

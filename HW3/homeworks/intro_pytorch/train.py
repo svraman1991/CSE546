@@ -50,7 +50,37 @@ def train(
         - Make sure to load the model parameters corresponding to model with the best validation loss (if val_loader is provided).
             You might want to look into state_dict: https://pytorch.org/tutorials/beginner/saving_loading_models.html
     """
-    raise NotImplementedError("Your Code Goes Here")
+    v_loss = {
+        "train": [],
+        "val": []
+    }
+
+    for _ in range(epochs):
+        v_train_loss = 0
+        v_val_loss = 0
+        print(_, end="")
+
+        for (x, y) in train_loader:
+            optimizer.zero_grad()
+            v_y_hat = model(x)
+            v_ind_loss = criterion(v_y_hat, y)
+            v_train_loss += v_ind_loss.item()
+            v_ind_loss.backward()
+            optimizer.step()
+
+        v_loss["train"].append(v_train_loss / len(train_loader))
+
+        print()
+        if val_loader:
+            with torch.no_grad():
+                for (x, y) in val_loader:
+                    v_y_hat = model(x)
+                    v_ind_loss = criterion(v_y_hat, y)
+                    v_val_loss += v_ind_loss.item()
+            v_loss["val"].append(v_val_loss / len(val_loader))
+
+    return v_loss
+    # raise NotImplementedError("Your Code Goes Here")
 
 
 def plot_model_guesses(
@@ -113,4 +143,5 @@ def plot_model_guesses(
         plt.xlabel("x0")
         plt.ylabel("x1")
         plt.legend()
+        plt.savefig("scatter.png")
         plt.show()
